@@ -6,6 +6,7 @@ import io
 from stat import S_IFDIR, S_IFREG
 import asyncio
 from consts import *
+import threading
 
 intents = discord.Intents.default()
 intents.messages = True
@@ -81,8 +82,7 @@ class DiscordFS(Operations):
             if message.attachments and message.attachments[0].filename == filename:
                 await message.delete()
 
-def main(mountpoint):
-    loop = asyncio.get_event_loop()
+def start_fuse(mountpoint, loop):
     fuse_operations = DiscordFS(loop)
     FUSE(fuse_operations, mountpoint, nothreads=True, foreground=True)
 
@@ -92,6 +92,10 @@ if __name__ == '__main__':
     @client.event
     async def on_ready():
         print(f'Logged in as {client.user}')
-        main(mountpoint)
+
+        # Запуск FUSE в отдельном потоке
+        loop = asyncio.get_event_loop()
+        fuse_thread = threading.Thread(target=start_fuse, args=(mountpoint, loop))
+        fuse_thread.start()
 
     client.run(TOKEN)
