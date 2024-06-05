@@ -14,6 +14,7 @@ intents.guilds = True
 
 client = discord.Client(intents=intents)
 
+
 class DiscordFS(Operations):
     def __init__(self, loop):
         self.loop = loop
@@ -71,10 +72,10 @@ class DiscordFS(Operations):
     async def send_message(self, channel_id, content, filename=None):
         channel = client.get_channel(channel_id)
         if filename:
-            file = discord.File(fp=io.BytesIO(content.encode()), filename=filename)
+            file = discord.File(fp=io.BytesIO(content), filename=filename)
             await channel.send(file=file)
         else:
-            await channel.send(content)
+            await channel.send(content.decode())
 
     async def delete_message(self, channel_id, filename):
         channel = client.get_channel(channel_id)
