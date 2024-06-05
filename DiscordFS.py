@@ -4,16 +4,21 @@ import discord
 from fuse import FUSE, Operations
 import io
 from stat import S_IFDIR, S_IFREG
+import asyncio
 
 TOKEN = 'YOUR_DISCORD_BOT_TOKEN'
-GUILD_ID = 1
-ROOT_CHANNEL_ID = 1
+GUILD_ID = YOUR_GUILD_ID
+ROOT_CHANNEL_ID = YOUR_ROOT_CHANNEL_ID
 
-client = discord.Client()
+intents = discord.Intents.default()
+intents.messages = True
+intents.guilds = True
 
+client = discord.Client(intents=intents)
 
 class DiscordFS(Operations):
-    def __init__(self):
+    def __init__(self, loop):
+        self.loop = loop
         self.channels = {}  # Сохранение каналов как директорий
 
     def getattr(self, path, fh=None):
@@ -30,40 +35,40 @@ class DiscordFS(Operations):
     def mkdir(self, path, mode):
         # Создание новой директории (канала)
         dirname = path.strip('/')
-        client.loop.create_task(self.create_channel(dirname))
+        asyncio.run_coroutine_threadsafe(self.create_channel(dirname), self.loop).result()
         self.channels[dirname] = None
 
     def rmdir(self, path):
         # Удаление директории (канала)
         dirname = path.strip('/')
         if dirname in self.channels:
-            client.loop.create_task(self.delete_channel(dirname))
+            asyncio.run_coroutine_threadsafe(self.delete_channel(dirname), self.loop).result()
             del self.channels[dirname]
-
-    async def create_channel(self, name):
-        guild = client.get_guild(GUILD_ID)
-        return await guild.create_text_channel(name)
-
-    async def delete_channel(self, name):
-        guild = client.get_guild(GUILD_ID)
-        channel = discord.utils.get(guild.channels, name=name)
-        await channel.delete()
 
     def create(self, path, mode, fi=None):
         # Создание файла (отправка сообщения)
         filename = path.strip('/')
-        client.loop.create_task(self.send_message(ROOT_CHANNEL_ID, f"New file created: {filename}"))
+        asyncio.run_coroutine_threadsafe(self.send_message(ROOT_CHANNEL_ID, f"New file created: {filename}"), self.loop).result()
 
     def write(self, path, data, offset, fh):
         # Запись данных в файл (отправка сообщения с файлом)
         filename = path.strip('/')
-        client.loop.create_task(self.send_message(ROOT_CHANNEL_ID, data, filename=filename))
+        asyncio.run_coroutine_threadsafe(self.send_message(ROOT_CHANNEL_ID, data, filename=filename), self.loop).result()
         return len(data)
 
     def unlink(self, path):
         # Удаление файла (удаление сообщения)
         filename = path.strip('/')
-        client.loop.create_task(self.delete_message(ROOT_CHANNEL_ID, filename))
+        asyncio.run_coroutine_threadsafe(self.delete_message(ROOT_CHANNEL_ID, filename), self.loop).result()
+
+    async def create_channel(self, name):
+        guild = client.get_guild(GUILD_ID)
+        await guild.create_text_channel(name)
+
+    async def delete_channel(self, name):
+        guild = client.get_guild(GUILD_ID)
+        channel = discord.utils.get(guild.channels, name=name)
+        await channel.delete()
 
     async def send_message(self, channel_id, content, filename=None):
         channel = client.get_channel(channel_id)
@@ -79,12 +84,17 @@ class DiscordFS(Operations):
             if message.attachments and message.attachments[0].filename == filename:
                 await message.delete()
 
-
 def main(mountpoint):
-    FUSE(DiscordFS(), mountpoint, nothreads=True, foreground=True)
-
+    loop = asyncio.get_event_loop()
+    fuse_operations = DiscordFS(loop)
+    FUSE(fuse_operations, mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
     mountpoint = sys.argv[1]
-    client.loop.create_task(main(mountpoint))
+
+    @client.event
+    async def on_ready():
+        print(f'Logged in as {client.user}')
+        main(mountpoint)
+
     client.run(TOKEN)
