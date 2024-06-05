@@ -5,10 +5,7 @@ from fuse import FUSE, Operations
 import io
 from stat import S_IFDIR, S_IFREG
 import asyncio
-
-TOKEN = 'YOUR_DISCORD_BOT_TOKEN'
-GUILD_ID = YOUR_GUILD_ID
-ROOT_CHANNEL_ID = YOUR_ROOT_CHANNEL_ID
+from consts.py import *
 
 intents = discord.Intents.default()
 intents.messages = True
