@@ -5,7 +5,7 @@ from fuse import FUSE, Operations
 import io
 from stat import S_IFDIR, S_IFREG
 import asyncio
-from consts.py import *
+from consts import *
 
 intents = discord.Intents.default()
 intents.messages = True
