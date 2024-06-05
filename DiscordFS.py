@@ -19,6 +19,7 @@ class DiscordFS(Operations):
     def __init__(self, loop):
         self.loop = loop
         self.channels = {}  # Сохранение каналов как директорий
+        self.files = {}     # Сохранение файлов
 
     def getattr(self, path, fh=None):
         # Атрибуты файла или директории
@@ -52,13 +53,25 @@ class DiscordFS(Operations):
     def write(self, path, data, offset, fh):
         # Запись данных в файл (отправка сообщения с файлом)
         filename = path.strip('/')
-        asyncio.run_coroutine_threadsafe(self.send_message(ROOT_CHANNEL_ID, data, filename=filename), self.loop).result()
+        message = asyncio.run_coroutine_threadsafe(self.send_message(ROOT_CHANNEL_ID, data, filename=filename), self.loop).result()
+        self.files[filename] = message.id  # Сохранение ID сообщения для последующего чтения
         return len(data)
+
+    def read(self, path, size, offset, fh):
+        # Чтение данных из файла (получение содержимого сообщения)
+        filename = path.strip('/')
+        message_id = self.files.get(filename)
+        if message_id:
+            content = asyncio.run_coroutine_threadsafe(self.get_message_content(ROOT_CHANNEL_ID, message_id), self.loop).result()
+            return content[offset:offset + size]
+        else:
+            raise IOError("File not found")
 
     def unlink(self, path):
         # Удаление файла (удаление сообщения)
         filename = path.strip('/')
         asyncio.run_coroutine_threadsafe(self.delete_message(ROOT_CHANNEL_ID, filename), self.loop).result()
+        del self.files[filename]
 
     async def create_channel(self, name):
         guild = client.get_guild(GUILD_ID)
@@ -73,9 +86,20 @@ class DiscordFS(Operations):
         channel = client.get_channel(channel_id)
         if filename:
             file = discord.File(fp=io.BytesIO(content), filename=filename)
-            await channel.send(file=file)
+            message = await channel.send(file=file)
         else:
-            await channel.send(content.decode())
+            message = await channel.send(content.decode())
+        return message
+
+    async def get_message_content(self, channel_id, message_id):
+        channel = client.get_channel(channel_id)
+        message = await channel.fetch_message(message_id)
+        if message.attachments:
+            attachment = message.attachments[0]
+            content = await attachment.read()
+        else:
+            content = message.content.encode()
+        return content
 
     async def delete_message(self, channel_id, filename):
         channel = client.get_channel(channel_id)
