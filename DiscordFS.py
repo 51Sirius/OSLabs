@@ -26,6 +26,7 @@ class DiscordFUSE(Operations):
         self.loop.run_until_complete(self.init_bot())
 
     async def init_bot(self):
+        await self.client.wait_until_ready()
         guild = self.client.get_guild(GUILD_ID)
         self.root_channel = guild.get_channel(ROOT_CHANNEL_ID)
 
