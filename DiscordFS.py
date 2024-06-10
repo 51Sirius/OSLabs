@@ -99,6 +99,8 @@ class DiscordFUSE(Operations):
         message = self.loop.run_until_complete(channel.send(file=file))
         self.messages[channel_name][file_name] = message
 
+        return 0
+
     def write(self, path, data, offset, fh):
         file_name = os.path.basename(path)
 
