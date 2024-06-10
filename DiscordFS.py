@@ -18,7 +18,6 @@ class DiscordFUSE(Operations):
         self.channels = {}
         self.loop = asyncio.get_event_loop()
 
-        # Run the bot in the background
         self.loop.create_task(self.client.start(TOKEN))
         self.loop.run_until_complete(self.init_bot())
 
@@ -31,9 +30,7 @@ class DiscordFUSE(Operations):
             print("Invalid root channel ID or the channel is not a text channel.")
             sys.exit(1)
         
-        # Create channels dictionary for root channel
         self.channels = {channel.name: channel for channel in guild.channels if isinstance(channel, discord.TextChannel) and channel.category_id == root_channel.category_id}
-        print("Bot is ready and channels are initialized.")
 
     def readdir(self, path, fh):
         return ['.', '..'] + [channel for channel in self.channels]
@@ -48,14 +45,21 @@ class DiscordFUSE(Operations):
         category = root_channel.category
         
         if category:
-            # Запуск асинхронной задачи в существующем event loop
-            self.loop.run_until_complete(self.create_channel(guild, channel_name, category))
+            self.loop.run_until_complete(guild.create_text_channel(channel_name, category=category))
+            self.channels[channel_name] = new_channel
         else:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
-    async def create_channel(self, guild, channel_name, category):
-        new_channel = await guild.create_text_channel(channel_name, category=category)
-        self.channels[channel_name] = new_channel
+    def rmdir(self, path):
+        channel_name = os.path.basename(path)
+        if channel_name not in self.channels:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        guild = self.client.get_guild(GUILD_ID)
+        channel = self.channels[channel_name]
+        
+        self.loop.run_until_complete(channel.delete())
+        del self.channels[channel_name]
 
     def getattr(self, path, fh=None):
         st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)
