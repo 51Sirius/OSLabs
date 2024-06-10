@@ -22,10 +22,13 @@ class DiscordFUSE(Operations):
         intents = discord.Intents.default()
         intents.guilds = True
         intents.guild_messages = True
-        client = commands.Bot(command_prefix="!", intents=intents)
-        await client.start(TOKEN)
-        await client.wait_until_ready()
-        guild = client.get_guild(GUILD_ID)
+        self.client = commands.Bot(command_prefix="!", intents=intents)
+        
+        await self.client.login(TOKEN)
+        await self.client.connect()
+
+        await self.client.wait_until_ready()
+        guild = self.client.get_guild(GUILD_ID)
         self.root_channel = guild.get_channel(ROOT_CHANNEL_ID)
         
         if not self.root_channel or not isinstance(self.root_channel, discord.TextChannel):
@@ -34,7 +37,12 @@ class DiscordFUSE(Operations):
 
         self.category = self.root_channel.category
 
+        if not self.category:
+            print("Root channel does not have a category.")
+            sys.exit(1)
+
         self.channels = {channel.name: channel for channel in self.category.text_channels}
+        print("Bot is ready and channels are initialized.")
 
     def readdir(self, path, fh):
         if path == '/':
@@ -49,6 +57,7 @@ class DiscordFUSE(Operations):
         
         new_channel = self.loop.run_until_complete(self.category.create_text_channel(channel_name))
         self.channels[channel_name] = new_channel
+        print(f"Channel {channel_name} created.")
 
     def rmdir(self, path):
         channel_name = os.path.basename(path)
@@ -59,6 +68,7 @@ class DiscordFUSE(Operations):
         
         self.loop.run_until_complete(channel.delete())
         del self.channels[channel_name]
+        print(f"Channel {channel_name} deleted.")
 
     def getattr(self, path, fh=None):
         st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)
