@@ -164,6 +164,24 @@ class DiscordFUSE(Operations):
         del self.messages[channel_name][file_name]
         self.loop.run_until_complete(message.delete())
 
+    def read(self, path, size, offset, fh):
+        file_name = os.path.basename(path)
+
+        channel_name = os.path.dirname(path).strip('/')
+        if not channel_name:
+            channel_name = self.root_channel.name
+        elif channel_name not in self.channels:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        if file_name not in self.messages[channel_name]:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        message = self.messages[channel_name][file_name]
+
+        file_content = self.loop.run_until_complete(message.attachments[0].read())
+
+        return file_content[offset:offset + size]
+
 
 def main(mountpoint):
     fuse = FUSE(DiscordFUSE(), mountpoint, foreground=True)
