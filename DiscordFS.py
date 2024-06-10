@@ -16,7 +16,8 @@ class DiscordFUSE(Operations):
         self.root_channel = None
         self.channels = {}
         self.loop = asyncio.get_event_loop()
-
+        self.client = commands.Bot(command_prefix="!", intents=intents)
+        self.loop.create_task(self.client.start(TOKEN))
         self.loop.run_until_complete(self.init_bot())
 
     async def init_bot(self):
@@ -24,16 +25,7 @@ class DiscordFUSE(Operations):
         intents.guilds = True
         intents.guild_messages = True
 
-        client = commands.Bot(command_prefix="!", intents=intents)
-        print(1)
-        await client.login(TOKEN)
-        print(1)
-        await client.connect()
-        print(1)
-        await client.wait_until_ready()
-        print(1)
-
-        guild = client.get_guild(GUILD_ID)
+        guild = self.client.get_guild(GUILD_ID)
         self.root_channel = guild.get_channel(ROOT_CHANNEL_ID)
 
         if not self.root_channel or not isinstance(self.root_channel, discord.TextChannel):
