@@ -9,6 +9,7 @@ import stat
 
 from consts import *
 
+
 class DiscordFUSE(Operations):
     def __init__(self):
         self.category = None
@@ -22,13 +23,14 @@ class DiscordFUSE(Operations):
         intents = discord.Intents.default()
         intents.guilds = True
         intents.guild_messages = True
-        
+
         client = commands.Bot(command_prefix="!", intents=intents)
-        client.run(TOKEN)
-        
+        self.loop.create_task(client.start(TOKEN))
+        self.loop.run_until_complete(client.wait_until_ready())
+
         guild = client.get_guild(GUILD_ID)
         self.root_channel = guild.get_channel(ROOT_CHANNEL_ID)
-        
+
         if not self.root_channel or not isinstance(self.root_channel, discord.TextChannel):
             print("Invalid root channel ID or the channel is not a text channel.")
             sys.exit(1)
@@ -51,7 +53,7 @@ class DiscordFUSE(Operations):
         channel_name = os.path.basename(path)
         if channel_name in self.channels:
             raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), path)
-        
+
         new_channel = self.loop.run_until_complete(self.category.create_text_channel(channel_name))
         self.channels[channel_name] = new_channel
 
@@ -61,7 +63,7 @@ class DiscordFUSE(Operations):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
         channel = self.channels[channel_name]
-        
+
         self.loop.run_until_complete(channel.delete())
         del self.channels[channel_name]
 
@@ -71,8 +73,10 @@ class DiscordFUSE(Operations):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         return st
 
+
 def main(mountpoint):
     fuse = FUSE(DiscordFUSE(), mountpoint, foreground=True)
+
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
