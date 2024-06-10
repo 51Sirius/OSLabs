@@ -47,13 +47,16 @@ class DiscordFUSE(Operations):
         category = root_channel.category
         
         if category:
-            self.loop.create_task(guild.create_text_channel(channel_name, category=category))
-            self.channels[channel_name] = None  # Placeholder until channel is actually created
+            asyncio.run(self.create_channel(guild, channel_name, category))
         else:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
+    async def create_channel(self, guild, channel_name, category):
+        new_channel = await guild.create_text_channel(channel_name, category=category)
+        self.channels[channel_name] = new_channel
+
     def getattr(self, path, fh=None):
-        st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)  # Исправлено на stat.S_IFDIR
+        st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)
         if path != '/' and os.path.basename(path) not in self.channels:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         return st
