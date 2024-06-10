@@ -47,7 +47,9 @@ class DiscordFUSE(Operations):
         category = root_channel.category
         
         if category:
-            asyncio.run(self.create_channel(guild, channel_name, category))
+            # Запускаем асинхронную функцию в событийном цикле
+            self.loop.create_task(self.create_channel(guild, channel_name, category))
+            self.channels[channel_name] = None  # Placeholder until channel is actually created
         else:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
