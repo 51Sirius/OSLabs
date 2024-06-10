@@ -11,29 +11,33 @@ from consts import *
 
 class DiscordFUSE(Operations):
     def __init__(self):
-        intents = discord.Intents.default()
-        intents.guilds = True
-        intents.guild_messages = True
-        self.client = commands.Bot(command_prefix="!", intents=intents)
+        self.category = None
+        self.root_channel = None
         self.channels = {}
         self.loop = asyncio.get_event_loop()
 
-        self.loop.create_task(self.client.start(TOKEN))
         self.loop.run_until_complete(self.init_bot())
 
     async def init_bot(self):
-        await self.client.wait_until_ready()
-        guild = self.client.get_guild(GUILD_ID)
-        root_channel = guild.get_channel(ROOT_CHANNEL_ID)
+        intents = discord.Intents.default()
+        intents.guilds = True
+        intents.guild_messages = True
+        client = commands.Bot(command_prefix="!", intents=intents)
+        await client.start(TOKEN)
+        await client.wait_until_ready()
+        guild = client.get_guild(GUILD_ID)
+        self.root_channel = guild.get_channel(ROOT_CHANNEL_ID)
         
-        if not root_channel or not isinstance(root_channel, discord.TextChannel):
+        if not self.root_channel or not isinstance(self.root_channel, discord.TextChannel):
             print("Invalid root channel ID or the channel is not a text channel.")
             sys.exit(1)
-        
-        self.channels = {channel.name: channel for channel in guild.channels if isinstance(channel, discord.TextChannel) and channel.category_id == root_channel.category_id}
+
+        self.category = self.root_channel.category
+
+        self.channels = {channel.name: channel for channel in self.category.text_channels}
 
     def readdir(self, path, fh):
-        if (path == '/'):
+        if path == '/':
             return ['.', '..'] + [channel for channel in self.channels]
         else:
             return ['.', '..']
@@ -43,22 +47,14 @@ class DiscordFUSE(Operations):
         if channel_name in self.channels:
             raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), path)
         
-        guild = self.client.get_guild(GUILD_ID)
-        root_channel = guild.get_channel(ROOT_CHANNEL_ID)
-        category = root_channel.category
-        
-        if category:
-            new_channel = self.loop.run_until_complete(guild.create_text_channel(channel_name, category=category))
-            self.channels[channel_name] = new_channel
-        else:
-            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+        new_channel = self.loop.run_until_complete(self.category.create_text_channel(channel_name))
+        self.channels[channel_name] = new_channel
 
     def rmdir(self, path):
         channel_name = os.path.basename(path)
         if channel_name not in self.channels:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
-        guild = self.client.get_guild(GUILD_ID)
         channel = self.channels[channel_name]
         
         self.loop.run_until_complete(channel.delete())
@@ -71,7 +67,7 @@ class DiscordFUSE(Operations):
         return st
 
 def main(mountpoint):
-    fuse = FUSE(DiscordFUSE(), mountpoint, foreground=True)
+    FUSE(DiscordFUSE(), mountpoint, foreground=True)
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
