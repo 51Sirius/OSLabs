@@ -135,7 +135,7 @@ class DiscordFUSE(Operations):
         message = self.messages[channel_name][file_name]
 
         file_content = self.loop.run_until_complete(message.attachments[0].read())
-        file_content = file_content[:offset] + data.encode() + file_content[offset + len(data):]
+        file_content = file_content[:offset] + data + file_content[offset + len(data):]
 
         new_file = discord.File(io.BytesIO(file_content), filename=file_name)
 
