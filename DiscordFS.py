@@ -33,7 +33,10 @@ class DiscordFUSE(Operations):
         self.channels = {channel.name: channel for channel in guild.channels if isinstance(channel, discord.TextChannel) and channel.category_id == root_channel.category_id}
 
     def readdir(self, path, fh):
-        return ['.', '..'] + [channel for channel in self.channels]
+        if (path == '/')
+            return ['.', '..'] + [channel for channel in self.channels]
+        else:
+            return ['.', '..']
 
     def mkdir(self, path, mode):
         channel_name = os.path.basename(path)
