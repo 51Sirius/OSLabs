@@ -22,13 +22,13 @@ class DiscordFUSE(Operations):
         intents = discord.Intents.default()
         intents.guilds = True
         intents.guild_messages = True
-        self.client = commands.Bot(command_prefix="!", intents=intents)
+        client = commands.Bot(command_prefix="!", intents=intents)
         
-        await self.client.login(TOKEN)
-        await self.client.connect()
+        await client.login(TOKEN)
+        await client.connect()
 
-        await self.client.wait_until_ready()
-        guild = self.client.get_guild(GUILD_ID)
+        await client.wait_until_ready()
+        guild = client.get_guild(GUILD_ID)
         self.root_channel = guild.get_channel(ROOT_CHANNEL_ID)
         
         if not self.root_channel or not isinstance(self.root_channel, discord.TextChannel):
