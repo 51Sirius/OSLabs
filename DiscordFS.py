@@ -143,6 +143,8 @@ class DiscordFUSE(Operations):
         self.messages[channel_name][file_name] = new_message
         self.loop.run_until_complete(message.delete())
 
+        return len(data)
+
     def unlink(self, path):
         file_name = os.path.basename(path)
 
