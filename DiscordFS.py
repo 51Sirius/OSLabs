@@ -16,15 +16,16 @@ class DiscordFUSE(Operations):
         self.root_channel = None
         self.channels = {}
         self.loop = asyncio.get_event_loop()
-        self.client = commands.Bot(command_prefix="!", intents=intents)
-        self.loop.create_task(self.client.start(TOKEN))
-        self.loop.run_until_complete(self.init_bot())
-
-    async def init_bot(self):
+        
         intents = discord.Intents.default()
         intents.guilds = True
         intents.guild_messages = True
+        self.client = commands.Bot(command_prefix="!", intents=intents)
+        self.loop.create_task(self.client.start(TOKEN))
+        
+        self.loop.run_until_complete(self.init_bot())
 
+    async def init_bot(self):
         guild = self.client.get_guild(GUILD_ID)
         self.root_channel = guild.get_channel(ROOT_CHANNEL_ID)
 
