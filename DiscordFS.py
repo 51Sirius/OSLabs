@@ -51,7 +51,7 @@ class DiscordFUSE(Operations):
             return ['.', '..'] + [channel for channel in self.channels] + \
                    [file for file in self.messages[self.root_channel.name]]
         elif channel_name in self.channels:
-            return ['.', '..'] + [file for file in self.messages[self.channels[channel_name]]]
+            return ['.', '..'] + [file for file in self.messages[self.messages[channel_name]]]
 
     def mkdir(self, path, mode):
         channel_name = os.path.basename(path)
