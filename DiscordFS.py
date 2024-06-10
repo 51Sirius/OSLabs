@@ -49,7 +49,7 @@ class DiscordFUSE(Operations):
         
         if category:
             # Запуск асинхронной задачи в существующем event loop
-            asyncio.run_until_complete(self.create_channel(guild, channel_name, category))
+            self.loop.run_until_complete(self.create_channel(guild, channel_name, category))
         else:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
