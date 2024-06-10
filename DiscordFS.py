@@ -1,3 +1,4 @@
+import io
 import os
 import sys
 import errno
@@ -15,6 +16,7 @@ class DiscordFUSE(Operations):
         self.category = None
         self.root_channel = None
         self.channels = {}
+        self.messages = {}
         self.loop = asyncio.get_event_loop()
         
         intents = discord.Intents.default()
@@ -41,12 +43,15 @@ class DiscordFUSE(Operations):
             sys.exit(1)
 
         self.channels = {channel.name: channel for channel in self.category.text_channels}
+        self.messages = {channel.name: {} for channel in self.category.text_channels}
 
     def readdir(self, path, fh):
-        if path == '/':
-            return ['.', '..'] + [channel for channel in self.channels]
-        else:
-            return ['.', '..']
+        channel_name = path.strip('/')
+        if not channel_name:
+            return ['.', '..'] + [channel for channel in self.channels] + \
+                   [file for file in self.messages[self.root_channel.name]]
+        elif channel_name in self.channels:
+            return ['.', '..'] + [file for file in self.messages[self.root_channel.name]]
 
     def mkdir(self, path, mode):
         channel_name = os.path.basename(path)
@@ -55,6 +60,7 @@ class DiscordFUSE(Operations):
 
         new_channel = self.loop.run_until_complete(self.category.create_text_channel(channel_name))
         self.channels[channel_name] = new_channel
+        self.messages[channel_name] = {}
 
     def rmdir(self, path):
         channel_name = os.path.basename(path)
@@ -65,12 +71,76 @@ class DiscordFUSE(Operations):
 
         self.loop.run_until_complete(channel.delete())
         del self.channels[channel_name]
+        del self.messages[channel_name]
 
     def getattr(self, path, fh=None):
         st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)
         if path != '/' and os.path.basename(path) not in self.channels:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         return st
+
+    def create(self, path, mode, fi=None):
+        file_name = os.path.basename(path)
+
+        channel_name = os.path.dirname(path).strip('/')
+        if channel_name and channel_name in self.channels:
+            channel = self.channels[channel_name]
+        elif not channel_name:
+            channel = self.root_channel
+            channel_name = channel.name
+        else:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        if file_name in self.messages[channel_name]:
+            raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), path)
+
+        file = discord.File(fp=io.BytesIO(b''), filename=file_name)
+
+        message = self.loop.run_until_complete(channel.send(file=file))
+        self.messages[channel_name][file_name] = message
+
+    def write(self, path, data, offset, fh):
+        file_name = os.path.basename(path)
+
+        channel_name = os.path.dirname(path).strip('/')
+        if channel_name and channel_name in self.channels:
+            channel = self.channels[channel_name]
+        elif not channel_name:
+            channel = self.root_channel
+            channel_name = channel.name
+        else:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        if file_name not in self.messages[channel_name]:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        message = self.messages[channel_name][file_name]
+
+        file_content = message.attachments[0].read()
+        file_content = file_content[:offset] + data.encode() + file_content[offset + len(data):]
+
+        new_file = discord.File(io.BytesIO(file_content), filename=file_name)
+
+        new_message = self.loop.run_until_complete(channel.send(file=new_file))
+        self.messages[channel_name][file_name] = new_message
+        self.loop.run_until_complete(message.delete())
+
+    def unlink(self, path):
+        file_name = os.path.basename(path)
+
+        channel_name = os.path.dirname(path).strip('/')
+        if not channel_name:
+            channel_name = self.root_channel.name
+        elif channel_name not in self.channels:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        if file_name not in self.messages[channel_name]:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        message = self.messages[channel_name][file_name]
+
+        del self.messages[channel_name][file_name]
+        self.loop.run_until_complete(message.delete())
 
 
 def main(mountpoint):
