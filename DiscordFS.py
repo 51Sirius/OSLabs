@@ -1,126 +1,58 @@
 import os
 import sys
-import discord
+import errno
 from fuse import FUSE, Operations
-import io
-from stat import S_IFDIR, S_IFREG
-import asyncio
+import discord
+from discord.ext import commands
 from consts import *
-import threading
 
-intents = discord.Intents.default()
-intents.messages = True
-intents.guilds = True
+class DiscordFUSE(Operations):
+    def __init__(self):
+        self.client = commands.Bot(command_prefix="!")
+        self.client.loop.create_task(self.init_bot())
+        self.channels = {}
 
-client = discord.Client(intents=intents)
-
-
-class DiscordFS(Operations):
-    def __init__(self, loop):
-        self.loop = loop
-        self.channels = {}  # Сохранение каналов как директорий
-        self.files = {}     # Сохранение файлов
-
-    def getattr(self, path, fh=None):
-        # Атрибуты файла или директории
-        st = dict(st_mode=(S_IFDIR | 0o755), st_nlink=2)
-        if path != '/':
-            st = dict(st_mode=(S_IFREG | 0o644), st_nlink=1, st_size=100)
-        return st
+    async def init_bot(self):
+        await self.client.wait_until_ready()
+        guild = self.client.get_guild(GUILD_ID)
+        root_channel = guild.get_channel(ROOT_CHANNEL_ID)
+        
+        if not root_channel or not isinstance(root_channel, discord.TextChannel):
+            print("Invalid root channel ID or the channel is not a text channel.")
+            sys.exit(1)
+        
+        # Create channels dictionary for root channel
+        self.channels = {channel.name: channel for channel in guild.channels if isinstance(channel, discord.TextChannel) and channel.category_id == root_channel.category_id}
 
     def readdir(self, path, fh):
-        # Чтение содержимого директории
-        return ['.', '..'] + list(self.channels.keys())
+        return ['.', '..'] + [channel for channel in self.channels]
 
     def mkdir(self, path, mode):
-        # Создание новой директории (канала)
-        dirname = path.strip('/')
-        asyncio.run_coroutine_threadsafe(self.create_channel(dirname), self.loop).result()
-        self.channels[dirname] = None
-
-    def rmdir(self, path):
-        # Удаление директории (канала)
-        dirname = path.strip('/')
-        if dirname in self.channels:
-            asyncio.run_coroutine_threadsafe(self.delete_channel(dirname), self.loop).result()
-            del self.channels[dirname]
-
-    def create(self, path, mode, fi=None):
-        # Создание файла (отправка сообщения)
-        filename = path.strip('/')
-        asyncio.run_coroutine_threadsafe(self.send_message(ROOT_CHANNEL_ID, f"New file created: {filename}"), self.loop).result()
-
-    def write(self, path, data, offset, fh):
-        # Запись данных в файл (отправка сообщения с файлом)
-        filename = path.strip('/')
-        message = asyncio.run_coroutine_threadsafe(self.send_message(ROOT_CHANNEL_ID, data, filename=filename), self.loop).result()
-        self.files[filename] = message.id  # Сохранение ID сообщения для последующего чтения
-        return len(data)
-
-    def read(self, path, size, offset, fh):
-        # Чтение данных из файла (получение содержимого сообщения)
-        filename = path.strip('/')
-        message_id = self.files.get(filename)
-        if message_id:
-            content = asyncio.run_coroutine_threadsafe(self.get_message_content(ROOT_CHANNEL_ID, message_id), self.loop).result()
-            return content[offset:offset + size]
+        channel_name = os.path.basename(path)
+        if channel_name in self.channels:
+            raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), path)
+        
+        guild = self.client.get_guild(GUILD_ID)
+        root_channel = guild.get_channel(ROOT_CHANNEL_ID)
+        category = root_channel.category
+        
+        if category:
+            self.client.loop.create_task(guild.create_text_channel(channel_name, category=category))
+            self.channels[channel_name] = None  # Placeholder until channel is actually created
         else:
-            raise IOError("File not found")
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
-    def unlink(self, path):
-        # Удаление файла (удаление сообщения)
-        filename = path.strip('/')
-        asyncio.run_coroutine_threadsafe(self.delete_message(ROOT_CHANNEL_ID, filename), self.loop).result()
-        del self.files[filename]
+    def getattr(self, path, fh=None):
+        st = dict(st_mode=(os.stat.S_IFDIR | 0o755), st_nlink=2)
+        if path != '/' and os.path.basename(path) not in self.channels:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+        return st
 
-    async def create_channel(self, name):
-        guild = client.get_guild(GUILD_ID)
-        await guild.create_text_channel(name)
-
-    async def delete_channel(self, name):
-        guild = client.get_guild(GUILD_ID)
-        channel = discord.utils.get(guild.channels, name=name)
-        await channel.delete()
-
-    async def send_message(self, channel_id, content, filename=None):
-        channel = client.get_channel(channel_id)
-        if filename:
-            file = discord.File(fp=io.BytesIO(content), filename=filename)
-            message = await channel.send(file=file)
-        else:
-            message = await channel.send(content.decode())
-        return message
-
-    async def get_message_content(self, channel_id, message_id):
-        channel = client.get_channel(channel_id)
-        message = await channel.fetch_message(message_id)
-        if message.attachments:
-            attachment = message.attachments[0]
-            content = await attachment.read()
-        else:
-            content = message.content.encode()
-        return content
-
-    async def delete_message(self, channel_id, filename):
-        channel = client.get_channel(channel_id)
-        async for message in channel.history():
-            if message.attachments and message.attachments[0].filename == filename:
-                await message.delete()
-
-def start_fuse(mountpoint, loop):
-    fuse_operations = DiscordFS(loop)
-    FUSE(fuse_operations, mountpoint, nothreads=True, foreground=True)
+def main(mountpoint):
+    fuse = FUSE(DiscordFUSE(), mountpoint, foreground=True)
 
 if __name__ == '__main__':
-    mountpoint = sys.argv[1]
-
-    @client.event
-    async def on_ready():
-        print(f'Logged in as {client.user}')
-
-        # Запуск FUSE в отдельном потоке
-        loop = asyncio.get_event_loop()
-        fuse_thread = threading.Thread(target=start_fuse, args=(mountpoint, loop))
-        fuse_thread.start()
-
-    client.run(TOKEN)
+    if len(sys.argv) != 2:
+        print('usage: {} <mountpoint>'.format(sys.argv[0]))
+        sys.exit(1)
+    main(sys.argv[1])
