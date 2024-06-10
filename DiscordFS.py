@@ -1,6 +1,7 @@
 import os
 import sys
 import errno
+import asyncio
 from fuse import FUSE, Operations
 import discord
 from discord.ext import commands
@@ -12,10 +13,13 @@ class DiscordFUSE(Operations):
         intents.guilds = True
         intents.guild_messages = True
         self.client = commands.Bot(command_prefix="!", intents=intents)
-        self.client.loop.create_task(self.init_bot())
+        self.loop = asyncio.get_event_loop()
+        self.loop.run_until_complete(self.init_bot())
         self.channels = {}
         
     async def init_bot(self):
+        await self.client.login(TOKEN)
+        await self.client.connect()
         await self.client.wait_until_ready()
         guild = self.client.get_guild(GUILD_ID)
         root_channel = guild.get_channel(ROOT_CHANNEL_ID)
