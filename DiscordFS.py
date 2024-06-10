@@ -8,10 +8,13 @@ from consts import *
 
 class DiscordFUSE(Operations):
     def __init__(self):
-        self.client = commands.Bot(command_prefix="!")
+        intents = discord.Intents.default()
+        intents.guilds = True
+        intents.guild_messages = True
+        self.client = commands.Bot(command_prefix="!", intents=intents)
         self.client.loop.create_task(self.init_bot())
         self.channels = {}
-
+        
     async def init_bot(self):
         await self.client.wait_until_ready()
         guild = self.client.get_guild(GUILD_ID)
