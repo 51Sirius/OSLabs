@@ -51,7 +51,7 @@ class DiscordFUSE(Operations):
             return ['.', '..'] + [channel for channel in self.channels] + \
                    [file for file in self.messages[self.root_channel.name]]
         elif channel_name in self.channels:
-            return ['.', '..'] + [file for file in self.messages[self.channels[channel_name]]
+            return ['.', '..'] + [file for file in self.messages[self.channels[channel_name]]]
 
     def mkdir(self, path, mode):
         channel_name = os.path.basename(path)
@@ -82,7 +82,7 @@ class DiscordFUSE(Operations):
             if parts[0] in self.channels:
                 return st
             if parts[0] in self.messages[self.root_channel.name]:
-                st = dict(st_mode=(stat.S_IFREG | 0o644), st_size=self.messages[self.root_channel.name][file_name].attachments[0].size)
+                st = dict(st_mode=(stat.S_IFREG | 0o644), st_size=self.messages[self.root_channel.name][parts[0]].attachments[0].size)
                 return st
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         elif len(parts) == 2:
