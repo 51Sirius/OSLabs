@@ -67,7 +67,7 @@ class DiscordFUSE(Operations):
         return st
 
 def main(mountpoint):
-    FUSE(DiscordFUSE(), mountpoint, foreground=True)
+    fuse = FUSE(DiscordFUSE(), mountpoint, foreground=True)
 
 if __name__ == '__main__':
     if len(sys.argv) != 2:
