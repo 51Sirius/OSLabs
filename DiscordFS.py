@@ -48,17 +48,15 @@ class DiscordFUSE(Operations):
         category = root_channel.category
         
         if category:
-            print(f"Creating channel: {channel_name}")
-            asyncio.run_coroutine_threadsafe(self.create_channel(guild, channel_name, category), self.loop)
-            self.channels[channel_name] = None  # Placeholder until channel is actually created
+            # Запуск асинхронной задачи в существующем event loop
+            future = asyncio.run_coroutine_threadsafe(self.create_channel(guild, channel_name, category), self.loop)
+            result = future.result()  # Ожидание завершения задачи
         else:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
     async def create_channel(self, guild, channel_name, category):
-        print(f"Creating channel {channel_name} in category {category.name}")
         new_channel = await guild.create_text_channel(channel_name, category=category)
         self.channels[channel_name] = new_channel
-        print(f"Channel {channel_name} created.")
 
     def getattr(self, path, fh=None):
         st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)
