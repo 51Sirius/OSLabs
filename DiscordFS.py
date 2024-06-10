@@ -114,9 +114,7 @@ class DiscordFUSE(Operations):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
         if file_name in self.messages[channel_name]:
-            message = self.messages[channel_name][file_name]
-            del self.messages[channel_name][file_name]
-            self.loop.run_until_complete(message.delete())
+            raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), path)
 
         file = discord.File(fp=io.BytesIO(b''), filename=file_name)
 
@@ -187,6 +185,34 @@ class DiscordFUSE(Operations):
         file_content = self.loop.run_until_complete(message.attachments[0].read())
 
         return file_content[offset:offset + size]
+
+    def truncate(self, path, length, fh=None):
+        file_name = os.path.basename(path)
+
+        channel_name = os.path.dirname(path).strip('/')
+        if channel_name and channel_name in self.channels:
+            channel = self.channels[channel_name]
+        elif not channel_name:
+            channel = self.root_channel
+            channel_name = channel.name
+        else:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        if file_name not in self.messages[channel_name]:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        message = self.messages[channel_name][file_name]
+
+        file_content = self.loop.run_until_complete(message.attachments[0].read())
+        file_content = file_content[:length]
+
+        new_file = discord.File(io.BytesIO(file_content), filename=file_name)
+
+        new_message = self.loop.run_until_complete(channel.send(file=new_file))
+        self.messages[channel_name][file_name] = new_message
+        self.loop.run_until_complete(message.delete())
+
+        return 0
 
 
 def main(mountpoint):
