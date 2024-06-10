@@ -25,9 +25,13 @@ class DiscordFUSE(Operations):
         intents.guild_messages = True
 
         client = commands.Bot(command_prefix="!", intents=intents)
+        print(1)
         await client.login(TOKEN)
+        print(1)
         await client.connect()
+        print(1)
         await client.wait_until_ready()
+        print(1)
 
         guild = client.get_guild(GUILD_ID)
         self.root_channel = guild.get_channel(ROOT_CHANNEL_ID)
