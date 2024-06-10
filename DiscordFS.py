@@ -75,9 +75,20 @@ class DiscordFUSE(Operations):
 
     def getattr(self, path, fh=None):
         st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)
-        if path != '/' and os.path.basename(path) not in self.channels:
+        if path == '/':
+            return st
+        parts = path.strip('/').split('/')
+        if len(parts) == 1:
+            if parts[0] in self.channels:
+                return st
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
-        return st
+        elif len(parts) == 2:
+            channel_name, file_name = parts
+            if channel_name in self.channels and file_name in self.messages[channel_name]:
+                st = dict(st_mode=(stat.S_IFREG | 0o644), st_size=self.messages[channel_name][file_name].attachments[0].size)
+                return st
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
     def create(self, path, mode, fi=None):
         file_name = os.path.basename(path)
