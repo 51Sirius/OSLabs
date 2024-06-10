@@ -45,7 +45,7 @@ class DiscordFUSE(Operations):
         category = root_channel.category
         
         if category:
-            self.loop.run_until_complete(guild.create_text_channel(channel_name, category=category))
+            new_channel = self.loop.run_until_complete(guild.create_text_channel(channel_name, category=category)).result()
             self.channels[channel_name] = new_channel
         else:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
