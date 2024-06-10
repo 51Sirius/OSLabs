@@ -5,6 +5,8 @@ import asyncio
 from fuse import FUSE, Operations
 import discord
 from discord.ext import commands
+import stat
+
 from consts import *
 
 class DiscordFUSE(Operations):
@@ -51,7 +53,7 @@ class DiscordFUSE(Operations):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
     def getattr(self, path, fh=None):
-        st = dict(st_mode=(os.stat.S_IFDIR | 0o755), st_nlink=2)
+        st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)  # Исправлено на stat.S_IFDIR
         if path != '/' and os.path.basename(path) not in self.channels:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         return st
