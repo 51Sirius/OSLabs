@@ -82,15 +82,21 @@ class DiscordFUSE(Operations):
             if parts[0] in self.channels:
                 return st
             if parts[0] in self.messages[self.root_channel.name]:
+                message = self.messages[self.root_channel.name][parts[0]]
                 st = dict(st_mode=(stat.S_IFREG | 0o644),
-                          st_size=self.messages[self.root_channel.name][parts[0]].attachments[0].size)
+                          st_size=message.attachments[0].size,
+                          st_ctime=message.created_at.timestamp(),
+                          st_mtime=message.created_at.timestamp())
                 return st
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         elif len(parts) == 2:
             channel_name, file_name = parts
             if channel_name in self.channels and file_name in self.messages[channel_name]:
+                message = self.messages[channel_name][file_name]
                 st = dict(st_mode=(stat.S_IFREG | 0o644),
-                          st_size=self.messages[channel_name][file_name].attachments[0].size)
+                          st_size=message.attachments[0].size,
+                          st_ctime=message.created_at.timestamp(),
+                          st_mtime=message.created_at.timestamp())
                 return st
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
