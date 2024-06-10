@@ -33,6 +33,7 @@ class DiscordFUSE(Operations):
         
         # Create channels dictionary for root channel
         self.channels = {channel.name: channel for channel in guild.channels if isinstance(channel, discord.TextChannel) and channel.category_id == root_channel.category_id}
+        print("Bot is ready and channels are initialized.")
 
     def readdir(self, path, fh):
         return ['.', '..'] + [channel for channel in self.channels]
@@ -47,15 +48,17 @@ class DiscordFUSE(Operations):
         category = root_channel.category
         
         if category:
-            # Запускаем асинхронную функцию в событийном цикле
-            self.loop.create_task(self.create_channel(guild, channel_name, category))
+            print(f"Creating channel: {channel_name}")
+            asyncio.run_coroutine_threadsafe(self.create_channel(guild, channel_name, category), self.loop)
             self.channels[channel_name] = None  # Placeholder until channel is actually created
         else:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
     async def create_channel(self, guild, channel_name, category):
+        print(f"Creating channel {channel_name} in category {category.name}")
         new_channel = await guild.create_text_channel(channel_name, category=category)
         self.channels[channel_name] = new_channel
+        print(f"Channel {channel_name} created.")
 
     def getattr(self, path, fh=None):
         st = dict(st_mode=(stat.S_IFDIR | 0o755), st_nlink=2)
