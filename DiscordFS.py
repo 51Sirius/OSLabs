@@ -13,13 +13,14 @@ class DiscordFUSE(Operations):
         intents.guilds = True
         intents.guild_messages = True
         self.client = commands.Bot(command_prefix="!", intents=intents)
-        self.loop = asyncio.get_event_loop()
-        self.loop.run_until_complete(self.init_bot())
         self.channels = {}
-        
+        self.loop = asyncio.get_event_loop()
+
+        # Run the bot in the background
+        self.loop.create_task(self.client.start(TOKEN))
+        self.loop.run_until_complete(self.init_bot())
+
     async def init_bot(self):
-        await self.client.login(TOKEN)
-        await self.client.connect()
         await self.client.wait_until_ready()
         guild = self.client.get_guild(GUILD_ID)
         root_channel = guild.get_channel(ROOT_CHANNEL_ID)
@@ -44,7 +45,7 @@ class DiscordFUSE(Operations):
         category = root_channel.category
         
         if category:
-            self.client.loop.create_task(guild.create_text_channel(channel_name, category=category))
+            self.loop.create_task(guild.create_text_channel(channel_name, category=category))
             self.channels[channel_name] = None  # Placeholder until channel is actually created
         else:
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
