@@ -82,13 +82,15 @@ class DiscordFUSE(Operations):
             if parts[0] in self.channels:
                 return st
             if parts[0] in self.messages[self.root_channel.name]:
-                st = dict(st_mode=(stat.S_IFREG | 0o644), st_size=self.messages[self.root_channel.name][parts[0]].attachments[0].size)
+                st = dict(st_mode=(stat.S_IFREG | 0o644),
+                          st_size=self.messages[self.root_channel.name][parts[0]].attachments[0].size)
                 return st
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         elif len(parts) == 2:
             channel_name, file_name = parts
             if channel_name in self.channels and file_name in self.messages[channel_name]:
-                st = dict(st_mode=(stat.S_IFREG | 0o644), st_size=self.messages[channel_name][file_name].attachments[0].size)
+                st = dict(st_mode=(stat.S_IFREG | 0o644),
+                          st_size=self.messages[channel_name][file_name].attachments[0].size)
                 return st
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
@@ -132,7 +134,7 @@ class DiscordFUSE(Operations):
 
         message = self.messages[channel_name][file_name]
 
-        file_content = message.attachments[0].read()
+        file_content = self.loop.run_until_complete(message.attachments[0].read())
         file_content = file_content[:offset] + data.encode() + file_content[offset + len(data):]
 
         new_file = discord.File(io.BytesIO(file_content), filename=file_name)
