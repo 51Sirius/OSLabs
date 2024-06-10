@@ -108,7 +108,9 @@ class DiscordFUSE(Operations):
             raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
 
         if file_name in self.messages[channel_name]:
-            raise FileExistsError(errno.EEXIST, os.strerror(errno.EEXIST), path)
+            message = self.messages[channel_name][file_name]
+            del self.messages[channel_name][file_name]
+            self.loop.run_until_complete(message.delete())
 
         file = discord.File(fp=io.BytesIO(b''), filename=file_name)
 
@@ -135,15 +137,13 @@ class DiscordFUSE(Operations):
         message = self.messages[channel_name][file_name]
 
         file_content = self.loop.run_until_complete(message.attachments[0].read())
-        file_content = file_content[:offset] + data + file_content[offset + len(data):]
+        file_content = file_content[:offset] + data.encode() + file_content[offset + len(data):]
 
         new_file = discord.File(io.BytesIO(file_content), filename=file_name)
 
         new_message = self.loop.run_until_complete(channel.send(file=new_file))
         self.messages[channel_name][file_name] = new_message
         self.loop.run_until_complete(message.delete())
-
-        return len(data)
 
     def unlink(self, path):
         file_name = os.path.basename(path)
