@@ -33,7 +33,7 @@ class DiscordFUSE(Operations):
         self.channels = {channel.name: channel for channel in guild.channels if isinstance(channel, discord.TextChannel) and channel.category_id == root_channel.category_id}
 
     def readdir(self, path, fh):
-        if (path == '/')
+        if (path == '/'):
             return ['.', '..'] + [channel for channel in self.channels]
         else:
             return ['.', '..']
