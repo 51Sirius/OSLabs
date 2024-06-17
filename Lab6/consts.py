@@ -1,0 +1,3 @@
+TOKEN = ""
+ROOT_CHANNEL_ID = 0
+GUILD_ID = 0
