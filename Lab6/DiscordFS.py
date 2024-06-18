@@ -214,13 +214,47 @@ class DiscordFUSE(Operations):
 
         return 0
 
+    def file_info(self, path):
+        file_name = os.path.basename(path)
+
+        channel_name = os.path.dirname(path).strip('/')
+        if not channel_name:
+            channel_name = self.root_channel.name
+        elif channel_name not in self.channels:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        if file_name not in self.messages[channel_name]:
+            raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), path)
+
+        message = self.messages[channel_name][file_name]
+
+        file_info = {
+            'file_name': file_name,
+            'size': message.attachments[0].size,
+            'created_at': message.created_at,
+        }
+
+        return file_info
+
 
 def main(mountpoint):
     fuse = FUSE(DiscordFUSE(), mountpoint, foreground=True)
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 2:
-        print('usage: {} <mountpoint>'.format(sys.argv[0]))
-        sys.exit(1)
-    main(sys.argv[1])
+    if __name__ == '__main__':
+        if len(sys.argv) == 2:
+            mountpoint = sys.argv[1]
+            main(mountpoint)
+        elif len(sys.argv) == 3 and sys.argv[1] == 'info':
+            path = sys.argv[2]
+            fuse = DiscordFUSE()
+            try:
+                info = fuse.file_info(path)
+                print(f"File: {info['file_name']}\nSize: {info['size']} bytes\nCreated at: {info['created_at']}")
+            except FileNotFoundError as e:
+                print(f"Error: {e}")
+        else:
+            print('usage: {} <mountpoint> | info <file_path>'.format(sys.argv[0]))
+            sys.exit(1)
+
